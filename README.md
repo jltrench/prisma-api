@@ -1,73 +1,318 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# Overview
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+### Docker w/ Prisma tree
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+```mermaid
+graph LR
 
-## Description
+subgraph "Host"
+  A[Prisma App]
+end
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+subgraph "Docker Container"
+  B[Docker]
+end
 
-## Installation
+subgraph "Arquivos"
+  C(Dockerfile)
+  D(docker-compose.yml)
+  E(entrypoint.sh)
+end
 
-```bash
-$ npm install
+A --> C
+C --> B
+D --> B
+E --> B
 ```
 
-## Running the app
+# Create
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+nest new prisma-api
 ```
 
-## Test
+### Dependencies
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm i --save @nestjs/core @nestjs/common rxjs reflect-metadata @nestjs/config
 ```
 
-## Support
+### Docker File
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```Dockerfile
+FROM node:lts-alpine
 
-## Stay in touch
+RUN apk add --no-cache bash
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+RUN npm install -g @nestjs/cli
 
-## License
+USER node
 
-Nest is [MIT licensed](LICENSE).
+WORKDIR /home/node/app
+
+```
+
+### Docker File (Postgres)
+
+```Dockerfile
+FROM postgres
+
+RUN usermod -u 1000 postgres
+```
+
+### Docker Entrypoint
+
+```sh
+#!/bin/sh
+
+npm install
+npm run build
+npm run start:dev
+
+```
+
+### Docker Compose
+
+```yml
+version: '3'
+
+services:
+  app:
+    build: .
+    entrypoint: .docker/entrypoint.sh
+    container_name: prismaapi-app
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/home/node/app
+    depends_on:
+      - db
+
+  db:
+    build: .docker/postgres
+    container_name: prismaapi-db
+    restart: always
+    tty: true
+    ports:
+      - "5432:5432"
+    volumes:
+      - .docker/dbdata:/var/lib/postgresql/data && sudo chmod 0700 /var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_DB=prismaapi
+
+```
+
+# Install Prisma in Docker Compose
+
+**Init docker bash**
+
+```bash
+ docker compose exec app bash
+```
+
+**Install Prisma in Container**
+
+```bash
+ npm install prisma -D
+```
+
+**Init Prisma in Container**
+
+```bash
+npx pisma init
+```
+
+This will create a prisma folder in root directory and change your .env file setting up a default DATABASE_URL.
+Then will need to change to your **Database** settings.
+
+###### Example
+
+.env file
+
+```shell
+NODE_ENV=development
+PORT=3000
+
+# This was inserted by `prisma init`:
+# Environment variables declared in this file are automatically made available to Prisma.
+# See the documentation for more detail: https://pris.ly/d/prisma-schema#accessing-environment-variables-from-the-schema
+
+# Prisma supports the native connection string format for PostgreSQL, MySQL, SQLite, SQL Server, MongoDB and CockroachDB.
+# See the documentation for all the connection string options: https://pris.ly/d/connection-strings
+
+DATABASE_URL="postgresql://postgres:docker@db:5432/prismaapi?schema=public" # Change here
+
+```
+
+# Migration
+
+### Inside the container shell
+
+```shell
+npx prisma migrate dev --name init
+```
+
+*This will create the folder migration and the SQL file.*
+
+# Generating Prisma Service
+
+### Inside the container shell
+
+```shell
+nest g service prisma
+```
+
+prisma.service.ts
+
+```ts
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService extends PrismaClient implements OnModuleInit {
+  async onModuleInit() {
+    await this.$connect();
+  }
+}
+
+```
+
+# Creating Prisma Studio
+
+### docker-compose
+
+Setting up the prisma studio default port
+
+```yml
+version: '3'
+
+services:
+  app:
+    build: .
+    entrypoint: .docker/entrypoint.sh
+    container_name: prismaapi-app
+    ports:
+      - "3000:3000"
+      - "5555:5555" # Add here the new Port
+    volumes:
+      - .:/home/node/app
+    depends_on:
+      - db
+
+  db:
+    build: .docker/postgres
+    container_name: prismaapi-db
+    restart: always
+    tty: true
+    ports:
+      - "5432:5432"
+    volumes:
+      - .docker/dbdata:/var/lib/postgresql/data && sudo chmod 0700 /var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=docker
+      - POSTGRES_DB=prismaapi
+
+```
+
+### Inside the container shell
+
+```shell
+npx prisma studio
+```
+
+Enter your 5555 port to see if its running!
+![clipboard.png](inkdrop://file:dv1Pkk-zt)
+
+# CRUD
+
+### Generating Users Resource
+
+docker sheel:
+
+```shell
+nest g res users
+```
+
+_ REST API
+
+### Installing Class-Validator && Class-Tranformer
+
+docker sheel:
+
+```shell
+npm install class-validator class-transf
+ormer
+```
+
+### Remove PrismaService from AppModule
+
+```ts
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { ConfigModule } from '@nestjs/config';
+import { UsersModule } from './users/users.module';
+
+@Module({
+  imports: [ConfigModule.forRoot(), UsersModule],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+```
+
+### Put the PrismaService inside UserModule
+
+```ts
+import { Module } from '@nestjs/common';
+import { UsersService } from './users.service';
+import { UsersController } from './users.controller';
+import { PrismaService } from 'src/prisma/prisma.service';
+
+@Module({
+  controllers: [UsersController],
+  providers: [UsersService, PrismaService],
+})
+export class UsersModule {}
+```
+
+### In main.ts create the Validation Pipe
+
+```ts
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  await app.listen(process.env.PORT || 3000);
+}
+bootstrap();
+```
+
+### Class validator in create-user.dto
+
+```ts
+import { IsEmail, IsString, IsBoolean, IsNotEmpty } from 'class-validator';
+
+export class CreateUserDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsBoolean()
+  admin: boolean;
+}
+```
