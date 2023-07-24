@@ -1,6 +1,4 @@
-# README - IN PROGRESS
-
-# Overview
+# NestJS - Prisma - Postgres
 
 ### Docker w/ Prisma tree
 
@@ -27,7 +25,7 @@ D --> B
 E --> B
 ```
 
-# Create
+## Create
 
 ```bash
 nest new prisma-api
@@ -105,7 +103,7 @@ services:
 
 ```
 
-# Install Prisma in Docker Compose
+## Install Prisma in Docker Compose
 
 **Init docker bash**
 
@@ -147,7 +145,7 @@ DATABASE_URL="postgresql://postgres:docker@db:5432/prismaapi?schema=public" # Ch
 
 ```
 
-# Migration
+## Migration
 
 ### Inside the container shell
 
@@ -157,7 +155,7 @@ npx prisma migrate dev --name init
 
 *This will create the folder migration and the SQL file.*
 
-# Generating Prisma Service
+## Generating Prisma Service
 
 ### Inside the container shell
 
@@ -180,7 +178,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
 
 ```
 
-# Creating Prisma Studio
+## Creating Prisma Studio
 
 ### docker-compose
 
@@ -226,7 +224,7 @@ npx prisma studio
 Enter your 5555 port to see if its running!
 ![clipboard.png](inkdrop://file:dv1Pkk-zt)
 
-# CRUD
+## CRUD
 
 ### Generating Users Resource
 
@@ -318,3 +316,353 @@ export class CreateUserDto {
   admin: boolean;
 }
 ```
+
+### Creating UserRepo
+
+users/repositories/users.repository.ts
+
+```ts
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { CreateUserDto } from '../dto/create-user.dto';
+import { UpdateUserDto } from '../dto/update-user.dto';
+import { UserEntity } from '../entities/user.entity';
+
+@Injectable()
+export class UsersRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(createUserDto: CreateUserDto): Promise<UserEntity> {
+    return this.prisma.user.create({
+      data: createUserDto,
+    });
+  }
+
+  async findAll(): Promise<UserEntity[]> {
+    return await this.prisma.user.findMany();
+  }
+
+  async findOne(id: number): Promise<UserEntity> {
+    return this.prisma.user.findUnique({
+      where: {
+        id,
+      },
+    });
+  }
+
+  async update(id: number, updateUserDto: UpdateUserDto): Promise<UserEntity> {
+    return this.prisma.user.update({
+      where: {
+        id,
+      },
+      data: updateUserDto,
+    });
+  }
+
+  async remove(id: number): Promise<UserEntity> {
+    return this.prisma.user.delete({
+      where: {
+        id,
+      },
+    });
+  }
+}
+```
+
+### Updating UserService && UserModule
+
+users/users.service.ts
+
+```ts
+import { Injectable } from '@nestjs/common';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UsersRepository } from './repositories/users.repository';
+
+@Injectable()
+export class UsersService {
+  constructor(private readonly usersRepository: UsersRepository) {}
+
+  create(createUserDto: CreateUserDto) {
+    return this.usersRepository.create(createUserDto);
+  }
+
+  findAll() {
+    return this.usersRepository.findAll();
+  }
+
+  findOne(id: number) {
+    return this.usersRepository.findOne(id);
+  }
+
+  update(id: number, updateUserDto: UpdateUserDto) {
+    return this.usersRepository.update(id, updateUserDto);
+  }
+
+  remove(id: number) {
+    return this.usersRepository.remove(id);
+  }
+}
+```
+
+\
+users/users.module.ts
+
+```ts
+import { Module } from '@nestjs/common';
+import { UsersService } from './users.service';
+import { UsersController } from './users.controller';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { UsersRepository } from './repositories/users.repository';
+
+@Module({
+  controllers: [UsersController],
+  providers: [UsersService, PrismaService, UsersRepository],
+})
+export class UsersModule {}
+```
+
+After that config, the basic CRUD is complete. \
+Helpful shell commands:
+
+- npx prisma migrate dev
+- docker compose up
+
+## Exceptions Filters
+
+```mermaid
+graph LR
+
+  A[Request]
+
+  B[Middleware]
+
+  C(Interceptor)
+  D(Route Handler)
+  E(Interceptor)
+
+
+A --> B
+B --> C
+C --> D
+D --> E
+```
+
+## Unauthorized Exception
+
+### Generate HttpException Filter
+
+common/filters/http-exception.filter.ts
+
+```ts
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+} from '@nestjs/common';
+import { Response } from 'express';
+
+@Catch(HttpException)
+export class HttpExceptionFilter<T extends HttpException>
+  implements ExceptionFilter
+{
+  catch(exception: T, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+
+    const status = exception.getStatus();
+    const exceptionResponse = exception.getResponse();
+
+    const error =
+      typeof response === 'string'
+        ? { message: exceptionResponse }
+        : (exceptionResponse as object);
+
+    response.status(status).json({
+      ...error,
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
+```
+
+### Creating Error Files
+
+common/errors/types/UnauthorizedError.ts
+
+```ts
+export class UnauthorizedError extends Error {}
+```
+
+### Creating Interceptor Files
+
+common/erros/interceptors/UnauthorizedError.interceptor.ts
+
+```ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { catchError, Observable } from 'rxjs';
+import { UnauthorizedError } from '../types/UnauthorizedError';
+
+@Injectable()
+export class UnauthorizedInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    return next.handle().pipe(
+      catchError(error => {
+        if (error instanceof UnauthorizedError) {
+          throw new UnauthorizedException(error.message);
+        } else {
+          throw error;
+        }
+      }),
+    );
+  }
+}
+```
+
+### Add the Interceptor in Global Pipe
+
+main.ts
+
+```ts
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+import { UnauthorizedInterceptor } from './common/errors/interceptors/unauthorized.interceptor';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  //app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(new UnauthorizedInterceptor());
+  await app.listen(process.env.PORT || 3000);
+}
+bootstrap();
+```
+
+Now the UnauthorizedInterceptor is complete.
+
+## NotFound Exception
+
+### Creating Error Files
+
+common/errors/types/NotFoundError.ts
+
+```ts
+export class NotFoundError extends Error {}
+```
+
+### Creating Interceptor Files
+
+common/errors/interceptors/notfound.interceptor.ts
+
+```ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  NotFoundException,
+} from '@nestjs/common';
+import { catchError, Observable } from 'rxjs';
+import { NotFoundError } from '../types/NotFoundError';
+
+@Injectable()
+export class NotFoundInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    return next.handle().pipe(
+      catchError(error => {
+        if (error instanceof NotFoundError) {
+          throw new NotFoundException(error.message);
+        } else {
+          throw error;
+        }
+      }),
+    );
+  }
+}
+```
+
+### Add the Interceptor in Global Pipe
+
+main.ts
+
+```ts
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+import { NotFoundInterceptor } from './common/errors/interceptors/notfound.interceptor';
+import { UnauthorizedInterceptor } from './common/errors/interceptors/unauthorized.interceptor';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  //app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(new UnauthorizedInterceptor());
+  app.useGlobalInterceptors(new NotFoundInterceptor());
+  await app.listen(process.env.PORT || 3000);
+}
+bootstrap();
+```
+
+Now the NotFoundException is complete.
+
+## Database Exception
+
+List of Prisma Errors:
+[Prisma - Errors Reference](https://www.prisma.io/docs/reference/api-reference/error-reference#error-codes) \
+How to handle Prisma Errors:
+[Prisma - Handling Errors](https://www.prisma.io/docs/concepts/components/prisma-client/handling-exceptions-and-errors)
+
+To create a *database exception* follow the same steps of Unauthorized and NotFound exceptions:
+
+- Create error class
+- Create interceptor class
+- Update main.ts with GlobalPipes <= Interceptor class
+
+Then, create a condition to see if the error is as PrismaError, and a type PrismaClientError.
+
+common/errors/types/PrismaClientError.ts
+
+```ts
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+
+export type PrismaClientError = PrismaClientKnownRequestError & {
+  meta?: { target: string };
+};
+```
+
+\
+common/utils/is-prisma-error.util.ts
+
+```ts
+import { PrismaClientError } from '../errors/types/PrismaClientError';
+
+export const isPrismaError = (e: PrismaClientError) => {
+  return (
+    typeof e.code === 'string' &&
+    typeof e.clientVersion === 'string' &&
+    (typeof e.meta === 'undefined' || typeof e.meta === 'object')
+  );
+};
+```
+
+Now implement that condition you create in database.interceptor.ts
