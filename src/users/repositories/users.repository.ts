@@ -27,7 +27,7 @@ export class UsersRepository {
   }
 
   async update(id: number, updateUserDto: UpdateUserDto): Promise<UserEntity> {
-    return await this.prisma.user.update({
+    return this.prisma.user.update({
       where: {
         id,
       },
@@ -36,7 +36,7 @@ export class UsersRepository {
   }
 
   async remove(id: number): Promise<UserEntity> {
-    return await this.prisma.user.delete({
+    return this.prisma.user.delete({
       where: {
         id,
       },
