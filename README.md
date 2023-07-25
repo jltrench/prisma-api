@@ -1,7 +1,5 @@
 # NestJS - Prisma - Postgres
-
-### Docker w/ Prisma tree
-
+### Docker w/ Prisma tree:
 ```mermaid
 graph LR
 
@@ -26,19 +24,16 @@ E --> B
 ```
 
 ## Create
-
 ```bash
 nest new prisma-api
 ```
 
 ### Dependencies
-
 ```bash
 npm i --save @nestjs/core @nestjs/common rxjs reflect-metadata @nestjs/config
 ```
 
 ### Docker File
-
 ```Dockerfile
 FROM node:lts-alpine
 
@@ -51,17 +46,13 @@ USER node
 WORKDIR /home/node/app
 
 ```
-
 ### Docker File (Postgres)
-
 ```Dockerfile
 FROM postgres
 
 RUN usermod -u 1000 postgres
 ```
-
 ### Docker Entrypoint
-
 ```sh
 #!/bin/sh
 
@@ -70,9 +61,7 @@ npm run build
 npm run start:dev
 
 ```
-
 ### Docker Compose
-
 ```yml
 version: '3'
 
@@ -104,32 +93,24 @@ services:
 ```
 
 ## Install Prisma in Docker Compose
-
 **Init docker bash**
-
 ```bash
  docker compose exec app bash
 ```
 
 **Install Prisma in Container**
-
 ```bash
  npm install prisma -D
 ```
 
-**Init Prisma in Container**
-
+**Init Prisma in Container** 
 ```bash
 npx pisma init
 ```
-
 This will create a prisma folder in root directory and change your .env file setting up a default DATABASE_URL.
 Then will need to change to your **Database** settings.
-
-###### Example
-
+###### Example:
 .env file
-
 ```shell
 NODE_ENV=development
 PORT=3000
@@ -146,25 +127,18 @@ DATABASE_URL="postgresql://postgres:docker@db:5432/prismaapi?schema=public" # Ch
 ```
 
 ## Migration
-
 ### Inside the container shell
-
 ```shell
 npx prisma migrate dev --name init
 ```
-
 *This will create the folder migration and the SQL file.*
 
 ## Generating Prisma Service
-
 ### Inside the container shell
-
 ```shell
 nest g service prisma
 ```
-
 prisma.service.ts
-
 ```ts
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
@@ -179,11 +153,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
 ```
 
 ## Creating Prisma Studio
-
 ### docker-compose
-
 Setting up the prisma studio default port
-
 ```yml
 version: '3'
 
@@ -215,38 +186,30 @@ services:
 
 ```
 
-### Inside the container shell
 
+### Inside the container shell
 ```shell
 npx prisma studio
 ```
 
 Enter your 5555 port to see if its running!
 ![clipboard.png](inkdrop://file:dv1Pkk-zt)
-
 ## CRUD
-
-### Generating Users Resource
-
+### Generating Users Resource:
 docker sheel:
-
 ```shell
 nest g res users
 ```
-
 _ REST API
 
 ### Installing Class-Validator && Class-Tranformer
-
 docker sheel:
-
 ```shell
 npm install class-validator class-transf
 ormer
 ```
 
 ### Remove PrismaService from AppModule
-
 ```ts
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
@@ -263,7 +226,6 @@ export class AppModule {}
 ```
 
 ### Put the PrismaService inside UserModule
-
 ```ts
 import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -278,7 +240,6 @@ export class UsersModule {}
 ```
 
 ### In main.ts create the Validation Pipe
-
 ```ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -299,7 +260,6 @@ bootstrap();
 ```
 
 ### Class validator in create-user.dto
-
 ```ts
 import { IsEmail, IsString, IsBoolean, IsNotEmpty } from 'class-validator';
 
@@ -318,9 +278,7 @@ export class CreateUserDto {
 ```
 
 ### Creating UserRepo
-
 users/repositories/users.repository.ts
-
 ```ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -370,9 +328,7 @@ export class UsersRepository {
 ```
 
 ### Updating UserService && UserModule
-
 users/users.service.ts
-
 ```ts
 import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -404,10 +360,8 @@ export class UsersService {
   }
 }
 ```
-
 \
 users/users.module.ts
-
 ```ts
 import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -424,8 +378,7 @@ export class UsersModule {}
 
 After that config, the basic CRUD is complete. \
 Helpful shell commands:
-
-- npx prisma migrate dev
+- npx prisma migrate dev 
 - docker compose up
 
 ## Exceptions Filters
@@ -434,7 +387,7 @@ Helpful shell commands:
 graph LR
 
   A[Request]
-
+  
   B[Middleware]
 
   C(Interceptor)
@@ -447,13 +400,9 @@ B --> C
 C --> D
 D --> E
 ```
-
 ## Unauthorized Exception
-
 ### Generate HttpException Filter
-
 common/filters/http-exception.filter.ts
-
 ```ts
 import {
   ArgumentsHost,
@@ -488,17 +437,12 @@ export class HttpExceptionFilter<T extends HttpException>
 ```
 
 ### Creating Error Files
-
 common/errors/types/UnauthorizedError.ts
-
 ```ts
 export class UnauthorizedError extends Error {}
 ```
-
 ### Creating Interceptor Files
-
 common/erros/interceptors/UnauthorizedError.interceptor.ts
-
 ```ts
 import {
   Injectable,
@@ -525,11 +469,8 @@ export class UnauthorizedInterceptor implements NestInterceptor {
   }
 }
 ```
-
 ### Add the Interceptor in Global Pipe
-
 main.ts
-
 ```ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -551,23 +492,15 @@ async function bootstrap() {
 }
 bootstrap();
 ```
-
 Now the UnauthorizedInterceptor is complete.
-
 ## NotFound Exception
-
 ### Creating Error Files
-
 common/errors/types/NotFoundError.ts
-
 ```ts
 export class NotFoundError extends Error {}
 ```
-
 ### Creating Interceptor Files
-
 common/errors/interceptors/notfound.interceptor.ts
-
 ```ts
 import {
   Injectable,
@@ -594,11 +527,8 @@ export class NotFoundInterceptor implements NestInterceptor {
   }
 }
 ```
-
 ### Add the Interceptor in Global Pipe
-
 main.ts
-
 ```ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -622,18 +552,14 @@ async function bootstrap() {
 }
 bootstrap();
 ```
-
 Now the NotFoundException is complete.
-
 ## Database Exception
-
 List of Prisma Errors:
 [Prisma - Errors Reference](https://www.prisma.io/docs/reference/api-reference/error-reference#error-codes) \
 How to handle Prisma Errors:
 [Prisma - Handling Errors](https://www.prisma.io/docs/concepts/components/prisma-client/handling-exceptions-and-errors)
 
 To create a *database exception* follow the same steps of Unauthorized and NotFound exceptions:
-
 - Create error class
 - Create interceptor class
 - Update main.ts with GlobalPipes <= Interceptor class
@@ -641,7 +567,6 @@ To create a *database exception* follow the same steps of Unauthorized and NotFo
 Then, create a condition to see if the error is as PrismaError, and a type PrismaClientError.
 
 common/errors/types/PrismaClientError.ts
-
 ```ts
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
@@ -649,10 +574,8 @@ export type PrismaClientError = PrismaClientKnownRequestError & {
   meta?: { target: string };
 };
 ```
-
 \
 common/utils/is-prisma-error.util.ts
-
 ```ts
 import { PrismaClientError } from '../errors/types/PrismaClientError';
 
@@ -664,5 +587,107 @@ export const isPrismaError = (e: PrismaClientError) => {
   );
 };
 ```
+\
+Now implement the error handling (In this example i will use the unique constraint failed [CODE = P2002])
 
-Now implement that condition you create in database.interceptor.ts
+common/errors/types/ConflictError.ts
+```ts
+export class ConflictError extends Error {}
+```
+
+common/errors/interceptors/conflict.interceptor.ts
+```ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  ConflictException,
+} from '@nestjs/common';
+import { catchError, Observable } from 'rxjs';
+import { ConflictError } from '../types/ConflictError';
+
+@Injectable()
+export class ConflictInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    return next.handle().pipe(
+      catchError(error => {
+        if (error instanceof ConflictError) {
+          throw new ConflictException(error.message);
+        } else {
+          throw error;
+        }
+      }),
+    );
+  }
+}
+```
+
+Creating a class for a specific Prisma Error
+```ts
+import { ConflictError } from './ConflictError';
+import { PrismaClientError } from './PrismaClientError';
+
+export class UniqueConstraintError extends ConflictError {
+  constructor(e: PrismaClientError) {
+    const uniqueField = e.meta.target;
+
+    super(`A record with this: ${uniqueField} already exists`);
+  }
+}
+```
+
+Handle Database Errors Function
+```ts
+import { DatabaseError } from '../errors/types/DatabaseError';
+import { PrismaClientError } from '../errors/types/PrismaClientError';
+import { UniqueConstraintError } from '../errors/types/UniqueConstraintError';
+
+enum PrismaErrors {
+  UniqueConstraintViolation = 'P2002',
+}
+
+export const handleDatabaseErrors = (error: PrismaClientError) => {
+  switch (error.code) {
+    case PrismaErrors.UniqueConstraintViolation:
+      return new UniqueConstraintError(error);
+
+    default:
+      return new DatabaseError(error.message);
+  }
+};
+```
+Now update the database interceptor with the handle function
+
+common/errors/interceptors/database.interceptor.ts
+```ts
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  BadRequestException,
+} from '@nestjs/common';
+import { catchError, Observable } from 'rxjs';
+import { handleDatabaseErrors } from 'src/common/utils/handle-database-errors.util';
+import { isPrismaError } from 'src/common/utils/is-prisma-error.util';
+import { DatabaseError } from '../types/DatabaseError';
+
+@Injectable()
+export class DatabaseInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    return next.handle().pipe(
+      catchError(error => {
+        if (isPrismaError(error)) {
+          error = handleDatabaseErrors(error);
+        }
+        if (error instanceof DatabaseError) {
+          throw new BadRequestException(error.message);
+        } else {
+          throw error;
+        }
+      }),
+    );
+  }
+}
+```
